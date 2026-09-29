@@ -5,6 +5,7 @@ import {
   doublePrecision,
   foreignKey,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -21,10 +22,16 @@ import {
  * Prisma generated ids client-side with cuid(); cuid2 keeps the same text
  * shape. Prisma scalar lists are nullable columns, so array fields here can
  * come back null on old rows — read them through `arr()`.
+ *
+ * The live database also carries the trust, deposit, subscription and
+ * scheduled-drop columns (and the DepositTransaction / SubscriptionEvent
+ * tables) from a later version of the app; they're declared here so
+ * `drizzle-kit push` never drops them, even though no page uses them yet.
  */
 
 export const userRole = pgEnum("UserRole", ["GIVER", "RECEIVER", "BOTH"]);
-export const subscriptionTier = pgEnum("SubscriptionTier", ["FREE", "PRO"]);
+export const subscriptionTier = pgEnum("SubscriptionTier", ["FREE", "PRO", "MEMBER"]);
+export const depositStatus = pgEnum("DepositStatus", ["NONE", "PENDING", "ACTIVE", "FORFEITED", "WITHDRAWN"]);
 export const itemCondition = pgEnum("ItemCondition", ["NEW", "LIKE_NEW", "GOOD", "FAIR"]);
 export const itemStatus = pgEnum("ItemStatus", [
   "AVAILABLE",
@@ -68,11 +75,37 @@ export const users = pgTable(
     updatedAt: updatedAt(),
     preferredCategories: text("preferredCategories").array(),
     socialLinks: jsonb("socialLinks"),
+
+    // Trust & moderation
+    trustScore: integer("trustScore").notNull().default(50),
+    totalGiven: integer("totalGiven").notNull().default(0),
+    totalReceived: integer("totalReceived").notNull().default(0),
+    totalConfirmed: integer("totalConfirmed").notNull().default(0),
+    totalDisputes: integer("totalDisputes").notNull().default(0),
+    isPhoneVerified: boolean("isPhoneVerified").notNull().default(false),
+    isBanned: boolean("isBanned").notNull().default(false),
+    banReason: text("banReason"),
+    bannedAt: timestamp("bannedAt", { precision: 3, mode: "date" }),
+
+    // Deposit (Paystack)
+    depositStatus: depositStatus("depositStatus").notNull().default("NONE"),
+    depositAmount: integer("depositAmount").notNull().default(0),
+    depositPaidAt: timestamp("depositPaidAt", { precision: 3, mode: "date" }),
+    depositRef: text("depositRef"),
+    paystackCustomerCode: text("paystackCustomerCode"),
+
+    // Subscription
+    subscriptionStatus: text("subscriptionStatus"),
+    subscriptionExpiry: timestamp("subscriptionExpiry", { precision: 3, mode: "date" }),
+    subscriptionRef: text("subscriptionRef"),
   },
   (t) => [
     uniqueIndex("User_supabaseId_key").on(t.supabaseId),
     uniqueIndex("User_email_key").on(t.email),
     uniqueIndex("User_username_key").on(t.username),
+    index("User_isBanned_idx").on(t.isBanned),
+    index("User_totalGiven_idx").on(t.totalGiven),
+    index("User_trustScore_idx").on(t.trustScore),
   ],
 );
 
@@ -95,6 +128,19 @@ export const items = pgTable(
     longitude: doublePrecision("longitude"),
     location: text("location"),
     giverId: text("giverId").notNull(),
+
+    // Value checks
+    declaredValue: integer("declaredValue"),
+    estimatedValueMin: integer("estimatedValueMin"),
+    estimatedValueMax: integer("estimatedValueMax"),
+    valueFlagged: boolean("valueFlagged").notNull().default(false),
+    valueFlagReason: text("valueFlagReason"),
+
+    // Scheduled drops
+    isScheduledDrop: boolean("isScheduledDrop").notNull().default(false),
+    scheduledDropAt: timestamp("scheduledDropAt", { precision: 3, mode: "date" }),
+    autoFallback: boolean("autoFallback").notNull().default(true),
+
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -102,6 +148,8 @@ export const items = pgTable(
     index("Item_giverId_idx").on(t.giverId),
     index("Item_status_isExchange_idx").on(t.status, t.isExchange),
     index("Item_category_idx").on(t.category),
+    index("Item_declaredValue_idx").on(t.declaredValue),
+    index("Item_scheduledDropAt_idx").on(t.scheduledDropAt),
     foreignKey({ name: "Item_giverId_fkey", columns: [t.giverId], foreignColumns: [users.id] })
       .onDelete("restrict")
       .onUpdate("cascade"),
@@ -134,9 +182,29 @@ export const requests = pgTable(
     disputeResolvedAt: timestamp("disputeResolvedAt", { precision: 3, mode: "date" }),
     dispatchedAt: timestamp("dispatchedAt", { precision: 3, mode: "date" }),
     deliveredAt: timestamp("deliveredAt", { precision: 3, mode: "date" }),
+    dispatchProofUrl: text("dispatchProofUrl"),
+
+    // Receipt confirmation
+    confirmDeadline: timestamp("confirmDeadline", { precision: 3, mode: "date" }),
+    autoConfirmed: boolean("autoConfirmed").notNull().default(false),
+    disputeResolution: text("disputeResolution"),
+
+    // Stake (Paystack)
+    stakeAmount: integer("stakeAmount"),
+    stakeRef: text("stakeRef"),
+    stakeStatus: text("stakeStatus"),
+
     createdAt: createdAt(),
+    // Unlike User/Item, this column has a database default.
+    updatedAt: timestamp("updatedAt", { precision: 3, mode: "date" })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`)
+      .$onUpdate(() => new Date()),
   },
   (t) => [
+    index("Request_confirmDeadline_idx").on(t.confirmDeadline),
+    index("Request_deliveryStatus_idx").on(t.deliveryStatus),
+    index("Request_status_idx").on(t.status),
     foreignKey({ name: "Request_itemId_fkey", columns: [t.itemId], foreignColumns: [items.id] })
       .onDelete("restrict")
       .onUpdate("cascade"),
@@ -236,6 +304,48 @@ export const notifications = pgTable(
   ],
 );
 
+export const depositTransactions = pgTable(
+  "DepositTransaction",
+  {
+    id: id(),
+    userId: text("userId").notNull(),
+    type: text("type").notNull(),
+    amount: integer("amount").notNull(),
+    reference: text("reference").notNull(),
+    requestId: text("requestId"),
+    status: text("status").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("DepositTransaction_reference_idx").on(t.reference),
+    index("DepositTransaction_requestId_idx").on(t.requestId),
+    index("DepositTransaction_userId_idx").on(t.userId),
+    foreignKey({ name: "DepositTransaction_userId_fkey", columns: [t.userId], foreignColumns: [users.id] })
+      .onDelete("restrict")
+      .onUpdate("cascade"),
+  ],
+);
+
+export const subscriptionEvents = pgTable(
+  "SubscriptionEvent",
+  {
+    id: id(),
+    userId: text("userId").notNull(),
+    event: text("event").notNull(),
+    tier: text("tier").notNull(),
+    amount: integer("amount"),
+    reference: text("reference"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("SubscriptionEvent_userId_idx").on(t.userId),
+    foreignKey({ name: "SubscriptionEvent_userId_fkey", columns: [t.userId], foreignColumns: [users.id] })
+      .onDelete("restrict")
+      .onUpdate("cascade"),
+  ],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   itemsListed: many(items),
   itemsRequested: many(requests),
@@ -244,6 +354,16 @@ export const usersRelations = relations(users, ({ many }) => ({
   comments: many(comments),
   notifications: many(notifications, { relationName: "recipient" }),
   actorNotifications: many(notifications, { relationName: "actor" }),
+  depositTransactions: many(depositTransactions),
+  subscriptionEvents: many(subscriptionEvents),
+}));
+
+export const depositTransactionsRelations = relations(depositTransactions, ({ one }) => ({
+  user: one(users, { fields: [depositTransactions.userId], references: [users.id] }),
+}));
+
+export const subscriptionEventsRelations = relations(subscriptionEvents, ({ one }) => ({
+  user: one(users, { fields: [subscriptionEvents.userId], references: [users.id] }),
 }));
 
 export const itemsRelations = relations(items, ({ one, many }) => ({
