@@ -5,6 +5,19 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* stuffsdrop tokens — every page colour goes through these so both themes work.
+     fg-* is the text ramp (strongest → faintest), surface-* the raised fills. */
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-fg-soft: var(--fg-soft);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-faint: var(--fg-faint);
+  --color-fg-ghost: var(--fg-ghost);
+  --shadow-soft: var(--shadow-soft);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
@@ -48,73 +61,98 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Light — modelled on mcs-sdk's light theme: lavender-tinted off-white page,
+   ink text, white cards separated by hairline borders and soft shadows. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: #fafafc;
+  --foreground: #1c1a22;
+  --card: #ffffff;
+  --card-foreground: #1c1a22;
+  --popover: #ffffff;
+  --popover-foreground: #1c1a22;
+  --primary: #1c1a22;
+  --primary-foreground: #fafafc;
+  --secondary: #f1f0f4;
+  --secondary-foreground: #1c1a22;
+  --muted: #f1f0f4;
+  --muted-foreground: #6c6971;
+  --accent: #f1f0f4;
+  --accent-foreground: #1c1a22;
+  --destructive: #e40014;
+  --border: rgb(10 10 10 / 0.1);
+  --input: rgb(10 10 10 / 0.1);
+  --ring: rgb(28 26 34 / 0.3);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #f5f3f9;
+  --sidebar-foreground: #3f3d46;
+  --sidebar-primary: #1c1a22;
+  --sidebar-primary-foreground: #fafafc;
+  --sidebar-accent: #ffffff;
+  --sidebar-accent-foreground: #1c1a22;
+  --sidebar-border: rgb(10 10 10 / 0.08);
+  --sidebar-ring: rgb(28 26 34 / 0.3);
+
+  /* Mint stays the accent; on a light page it needs a deeper shade for text. */
+  --brand: #00e6a0;
+  --brand-ink: #00875e;
+  --surface-2: #f1f0f4;
+  --surface-3: #e7e5ec;
+  --surface-4: #d4d2da;
+  --fg-soft: #3f3d46;
+  --fg-muted: #5f5c66;
+  --fg-subtle: #76737d;
+  --fg-faint: #9a97a1;
+  --fg-ghost: #bdbac3;
+  --shadow-soft: 0 1px 2px rgb(28 24 38 / 0.05), 0 1px 1px rgb(28 24 38 / 0.04);
+  --glass-shadow: 0 2px 6px rgb(28 24 38 / 0.06), 0 10px 24px rgb(28 24 38 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.55);
 }
 
+/* Dark — the original stuffsdrop look: near-black canvas, white type, mint accent. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: #030303;
+  --foreground: #fafafa;
+  --card: #0a0a0a;
+  --card-foreground: #fafafa;
+  --popover: #0a0a0a;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #030303;
+  --secondary: #141414;
+  --secondary-foreground: #fafafa;
+  --muted: #141414;
+  --muted-foreground: #71717a;
+  --accent: #161616;
+  --accent-foreground: #fafafa;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: rgb(255 255 255 / 0.08);
+  --input: rgb(255 255 255 / 0.12);
+  --ring: rgb(255 255 255 / 0.3);
+  --sidebar: #070707;
+  --sidebar-foreground: #d4d4d8;
+  --sidebar-primary: #00ffb2;
+  --sidebar-primary-foreground: #030303;
+  --sidebar-accent: #121212;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: rgb(255 255 255 / 0.08);
+  --sidebar-ring: rgb(255 255 255 / 0.3);
+
+  --brand: #00ffb2;
+  --brand-ink: #00ffb2;
+  --surface-2: #18181b;
+  --surface-3: #27272a;
+  --surface-4: #3f3f46;
+  --fg-soft: #d4d4d8;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #71717a;
+  --fg-faint: #52525b;
+  --fg-ghost: #3f3f46;
+  --shadow-soft: 0 0 0 transparent;
+  --glass-shadow: 0 4px 12px rgb(0 0 0 / 0.42), 0 20px 48px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.06);
 }
 
 @layer base {
@@ -127,4 +165,33 @@
   html {
     @apply font-sans;
   }
+}
+/* Hide scrollbars on scroll containers that opt in (rails, feeds). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+/* Floating glass surfaces (popovers, panels) — same treatment as mcs-sdk. */
+.surface-glass {
+  background: color-mix(in oklch, var(--card) 78%, transparent);
+  border: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--glass-shadow);
 }

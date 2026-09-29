@@ -1,0 +1,460 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Gift,
+  ArrowLeftRight,
+  Info,
+  Type,
+  Database,
+  Image as ImageIcon,
+  UploadCloud
+} from "lucide-react";
+
+
+const CATEGORIES = ["Clothing", "Shoes", "Accessories", "Equipment", "Kitchen", "Other"];
+const CONDITIONS = [
+  { value: "NEW", label: "Brand New" },
+  { value: "LIKE_NEW", label: "Like New" },
+  { value: "GOOD", label: "Pre-Owned" },
+  { value: "FAIR", label: "Archival" },
+];
+
+export default function CreateListStuffPage() {
+  const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const [exchangeMode, setExchangeMode] = useState<"custom" | "ledger">("custom");
+  const [ledgerItems, setLedgerItems] = useState<any[]>([]);
+
+  const [formData, setFormData] = useState({
+    title: "",
+    brand: "",
+    category: "Clothing",
+    condition: "GOOD",
+    size: "",
+    imageUrl: "",
+    description: "",
+    dropType: "free",
+    seekingDescription: "",
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch('/api/items')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) {
+          setLedgerItems(json.data.filter((item: any) => item.status !== 'completed'));
+        }
+      })
+      .catch(() => console.error("Failed to load ledger items"));
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset preview state when the image is cleared
+    if (!formData.imageUrl) setImageLoaded(false);
+  }, [formData.imageUrl]);
+
+  const updateField = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const tempUrl = URL.createObjectURL(file);
+      updateField("imageUrl", tempUrl);
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.title.trim()) newErrors.title = "Asset title is required.";
+    if (!formData.imageUrl.trim()) newErrors.imageUrl = "Visual documentation is required.";
+    if (formData.dropType === "exchange" && !formData.seekingDescription.trim()) {
+      newErrors.seekingDescription = "Specify your target exchange item.";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        ...formData,
+        isExchange: formData.dropType === "exchange",
+        images: [formData.imageUrl],
+        location: "Global",
+      };
+
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        router.push("/list-stuffs");
+      } else {
+        setErrors({ submit: json.error?.message || "Failed to process drop." });
+      }
+    } catch {
+      setErrors({ submit: "Network disruption. Try again." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className={`min-h-full w-full bg-background text-foreground selection:bg-brand selection:text-black flex flex-col lg:flex-row overflow-hidden`}>
+
+      {/* LEFT COLUMN: LIVE REACTIVE PREVIEW */}
+      <div className="w-full lg:w-1/2 h-[45vh] lg:h-[calc(100dvh-3rem)] sticky top-0 bg-background border-b lg:border-b-0 lg:border-r border-foreground/10 flex flex-col relative overflow-hidden">
+
+        <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H0V20z' fill='%23FFFFFF' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")` }} />
+
+        <div className={`absolute inset-0 transition-opacity duration-1000 ease-out bg-background ${formData.imageUrl ? "opacity-100" : "opacity-0"}`}>
+          {formData.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={formData.imageUrl}
+              alt="Asset Preview"
+              onLoad={() => setImageLoaded(true)}
+              className={`w-full h-full object-cover transition-all duration-1000 ease-out ${imageLoaded ? 'scale-100 blur-0' : 'scale-105 blur-xl'}`}
+            />
+          )}
+        </div>
+
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent pointer-events-none" />
+
+        <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 lg:p-16 z-10 flex flex-col justify-end">
+
+          <div className="flex flex-wrap items-center gap-2 mb-6 transition-all duration-500">
+            <span className="bg-surface-2/90 backdrop-blur-md px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-foreground rounded-sm flex items-center gap-2 shadow-xl">
+              <div className={`w-1.5 h-1.5 rounded-full ${formData.dropType === "free" ? "bg-foreground" : "bg-brand animate-pulse"}`} />
+              {formData.dropType === "free" ? "Free Drop" : "Exchange"}
+            </span>
+            <span className="bg-surface-2/90 backdrop-blur-md px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-fg-muted rounded-sm shadow-xl">
+              {formData.category}
+            </span>
+            {formData.size && (
+              <span className="bg-surface-2/90 backdrop-blur-md px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-brand-ink rounded-sm shadow-xl">
+                SZ {formData.size}
+              </span>
+            )}
+          </div>
+
+          <h2 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-fg-muted mb-2 transition-all duration-300">
+            {formData.brand || "Mkr. Unknown"}
+          </h2>
+
+          <h1 className="text-4xl md:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.9] break-words">
+            {formData.title ? (
+              <span className="text-foreground drop-shadow-2xl">{formData.title}</span>
+            ) : (
+              <span className="text-fg-ghost animate-pulse select-none">UNTITLED ASSET</span>
+            )}
+          </h1>
+
+          {formData.dropType === "exchange" && formData.seekingDescription && (
+            <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-xl">
+              <span className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-brand-ink mb-2">
+                <ArrowLeftRight className="w-3.5 h-3.5" /> Target Asset
+              </span>
+              <p className="text-xl md:text-2xl font-black uppercase tracking-tighter text-foreground leading-none drop-shadow-lg">
+                {formData.seekingDescription}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN: EDITORIAL FORM */}
+      <div className="w-full lg:w-1/2 h-full lg:h-[calc(100dvh-3rem)] overflow-y-auto no-scrollbar bg-background">
+        <div className="p-6 md:p-12 lg:p-20 max-w-2xl mx-auto">
+
+          <button
+            onClick={() => router.push("/list-stuffs")}
+            className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-fg-subtle hover:text-foreground transition-colors mb-12 outline-none bg-transparent border-none p-0"
+          >
+            <ArrowLeft className="w-4 h-4" strokeWidth={2} /> Return to Ledger
+          </button>
+
+          <form onSubmit={handleSubmit} className="space-y-16">
+
+            {/* 1. DROP PATH */}
+            <div className="space-y-6">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-fg-subtle block border-b border-foreground/10 pb-2">
+                1. Distribution Vector
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => updateField("dropType", "free")}
+                  className={`text-left p-6 transition-all duration-200 ease-out border rounded-sm cursor-pointer active:scale-[0.98] ${
+                    formData.dropType === "free"
+                      ? "bg-surface-2 text-foreground border-foreground/20 shadow-xl"
+                      : "bg-card text-fg-subtle border-foreground/10 hover:border-foreground/20 hover:text-fg-soft"
+                  }`}
+                >
+                  <Gift className={`w-6 h-6 mb-4 transition-colors ${formData.dropType === "free" ? "text-foreground" : "text-fg-faint"}`} strokeWidth={1.5} />
+                  <h3 className={`text-sm font-black uppercase tracking-widest mb-1.5 transition-colors ${formData.dropType === "free" ? "text-foreground" : ""}`}>Free Drop</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed opacity-80">
+                    Pass stuff on to the community.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => updateField("dropType", "exchange")}
+                  className={`text-left p-6 transition-all duration-200 ease-out border rounded-sm cursor-pointer active:scale-[0.98] ${
+                    formData.dropType === "exchange"
+                      ? "bg-surface-2 text-foreground border-foreground/20 shadow-xl"
+                      : "bg-card text-fg-subtle border-foreground/10 hover:border-foreground/20 hover:text-fg-soft"
+                  }`}
+                >
+                  <ArrowLeftRight className={`w-6 h-6 mb-4 transition-colors ${formData.dropType === "exchange" ? "text-brand-ink" : "text-fg-faint"}`} strokeWidth={1.5} />
+                  <h3 className={`text-sm font-black uppercase tracking-widest mb-1.5 transition-colors ${formData.dropType === "exchange" ? "text-foreground" : ""}`}>Exchange</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed opacity-80">
+                    Trade for a specific garment.
+                  </p>
+                </button>
+              </div>
+
+              {formData.dropType === "exchange" && (
+                <div className="pt-4 pb-2 animate-in fade-in slide-in-from-top-4 duration-300 space-y-6">
+
+                  <div className="inline-flex bg-surface-2/50 p-1 rounded-sm w-full md:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setExchangeMode("custom")}
+                      className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-[9px] font-black uppercase tracking-[0.2em] transition-all outline-none rounded-sm ${
+                        exchangeMode === "custom"
+                          ? "bg-background text-brand-ink shadow-sm"
+                          : "text-fg-subtle hover:text-fg-soft"
+                      }`}
+                    >
+                      <Type className="w-3.5 h-3.5" /> Custom
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExchangeMode("ledger")}
+                      className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-[9px] font-black uppercase tracking-[0.2em] transition-all outline-none rounded-sm ${
+                        exchangeMode === "ledger"
+                          ? "bg-background text-brand-ink shadow-sm"
+                          : "text-fg-subtle hover:text-fg-soft"
+                      }`}
+                    >
+                      <Database className="w-3.5 h-3.5" /> Ledger
+                    </button>
+                  </div>
+
+                  {exchangeMode === "custom" ? (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="WHAT ASSET ARE YOU SEEKING?"
+                        value={formData.seekingDescription}
+                        onChange={(e) => updateField("seekingDescription", e.target.value)}
+                        className={`w-full bg-transparent border-b-2 px-0 py-4 text-sm md:text-lg font-bold text-foreground transition-all outline-none placeholder:text-fg-ghost ${
+                          errors.seekingDescription ? "border-red-500" : "border-foreground/15 focus:border-brand-ink"
+                        }`}
+                      />
+                      {errors.seekingDescription && <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest mt-2">{errors.seekingDescription}</p>}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {ledgerItems.length === 0 ? (
+                        <p className="text-[10px] text-fg-subtle uppercase tracking-widest py-4">No active assets available on the ledger.</p>
+                      ) : (
+                        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x">
+                          {ledgerItems.map(item => {
+                            const isSelected = formData.seekingDescription === item.title;
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => updateField("seekingDescription", item.title)}
+                                className={`w-32 shrink-0 snap-start cursor-pointer transition-all duration-300 group ${
+                                  isSelected ? "opacity-100 scale-100" : "opacity-40 hover:opacity-80 scale-95 hover:scale-100"
+                                }`}
+                              >
+                                <div className={`w-full aspect-[4/5] bg-surface-2 overflow-hidden mb-3 border transition-colors rounded-sm ${isSelected ? "border-brand-ink" : "border-transparent"}`}>
+                                  {item.imageUrl && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                                  )}
+                                </div>
+                                <h4 className={`text-[9px] font-black uppercase tracking-widest truncate ${isSelected ? "text-brand-ink" : "text-foreground"}`}>
+                                  {item.title}
+                                </h4>
+                                <p className="text-[8px] font-bold uppercase tracking-widest text-fg-faint truncate mt-0.5">
+                                  @{item.user}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {formData.seekingDescription && exchangeMode === 'ledger' && (
+                        <div className="bg-surface-2 border border-foreground/15 px-5 py-4 flex items-center justify-between rounded-sm">
+                          <span className="text-[9px] font-black uppercase tracking-[0.2em] text-brand-ink">Target Locked</span>
+                          <span className="text-[10px] font-bold text-foreground uppercase truncate ml-4 max-w-[200px]">{formData.seekingDescription}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 2. ASSET TITLE */}
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-foreground border-b border-foreground/10 pb-2">
+                <Type className="w-4 h-4 text-fg-subtle" /> 2. Asset Name
+              </label>
+
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="TYPE ASSET TITLE HERE..."
+                  value={formData.title}
+                  onChange={(e) => updateField("title", e.target.value)}
+                  className={`w-full bg-transparent border-b-2 px-0 py-6 text-2xl md:text-3xl font-black uppercase tracking-tighter text-foreground transition-all outline-none placeholder:text-fg-ghost ${
+                    errors.title ? "border-red-500 focus:border-red-400" : "border-foreground/15 focus:border-foreground"
+                  }`}
+                />
+                {errors.title && <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest">{errors.title}</p>}
+              </div>
+            </div>
+
+            {/* 3. VISUALS */}
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-foreground border-b border-foreground/10 pb-2">
+                <ImageIcon className="w-4 h-4 text-fg-subtle" /> 3. Visual Upload
+              </label>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <label className="relative flex flex-col items-center justify-center bg-surface-2/30 hover:bg-surface-2 border border-dashed border-foreground/15 hover:border-brand-ink/50 transition-all cursor-pointer h-28 rounded-sm group">
+                  <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                  <UploadCloud className="w-5 h-5 text-fg-faint group-hover:text-brand-ink mb-2 transition-colors" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-fg-subtle group-hover:text-foreground transition-colors">Select Local File</span>
+                </label>
+
+                <div className="flex flex-col justify-center">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-fg-ghost mb-2">OR PASTE URL</span>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={formData.imageUrl}
+                    onChange={(e) => updateField("imageUrl", e.target.value)}
+                    className={`w-full bg-transparent border-b px-0 py-2 text-xs font-bold text-foreground transition-all outline-none placeholder:text-fg-ghost ${
+                      errors.imageUrl ? "border-red-500 focus:border-red-400" : "border-foreground/15 focus:border-brand-ink"
+                    }`}
+                  />
+                </div>
+              </div>
+              {errors.imageUrl && <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest">{errors.imageUrl}</p>}
+            </div>
+
+            {/* 4. DETAILS */}
+            <div className="space-y-6">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground block border-b border-foreground/10 pb-2">
+                4. Taxonomy & Grade
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <input
+                  type="text"
+                  placeholder="Brand / Maker (Optional)"
+                  value={formData.brand}
+                  onChange={(e) => updateField("brand", e.target.value)}
+                  className="w-full bg-transparent border-b border-foreground/15 px-0 py-3 text-xs font-bold text-foreground transition-all outline-none focus:border-foreground placeholder:text-fg-ghost"
+                />
+                <input
+                  type="text"
+                  placeholder="Size (e.g. M, 32, OS)"
+                  value={formData.size}
+                  onChange={(e) => updateField("size", e.target.value)}
+                  className="w-full bg-transparent border-b border-foreground/15 px-0 py-3 text-xs font-bold text-foreground transition-all outline-none focus:border-foreground placeholder:text-fg-ghost"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 pt-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-fg-faint block">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => updateField("category", e.target.value)}
+                    className="w-full bg-card border border-foreground/10 px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-foreground transition-all outline-none focus:border-foreground cursor-pointer appearance-none rounded-sm"
+                  >
+                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-fg-faint block">Condition</label>
+                  <select
+                    value={formData.condition}
+                    onChange={(e) => updateField("condition", e.target.value)}
+                    className="w-full bg-card border border-foreground/10 px-4 py-4 text-[10px] font-bold uppercase tracking-widest text-foreground transition-all outline-none focus:border-foreground cursor-pointer appearance-none rounded-sm"
+                  >
+                    {CONDITIONS.map((cond) => <option key={cond.value} value={cond.value}>{cond.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <textarea
+                rows={3}
+                placeholder="Curation Notes: Describe the history, measurements, or flaws..."
+                value={formData.description}
+                onChange={(e) => updateField("description", e.target.value)}
+                className="w-full bg-transparent border-b border-foreground/15 px-0 py-4 text-xs font-medium text-foreground transition-all outline-none focus:border-foreground placeholder:text-fg-ghost resize-none mt-2"
+              />
+            </div>
+
+            {errors.submit && (
+              <div className="p-4 border border-red-500/50 bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest flex items-center gap-3">
+                <Info className="w-4 h-4" /> SYS_ERR: {errors.submit}
+              </div>
+            )}
+
+            <div className="pt-8 pb-12">
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`
+                  w-full py-6 flex items-center justify-center gap-3 cursor-pointer
+                  transition-all duration-200 ease-out border rounded-sm
+                  ${submitting
+                    ? "bg-card text-fg-faint border-foreground/10 cursor-not-allowed"
+                    : "bg-brand text-black border-brand-ink hover:bg-brand/90 active:scale-[0.98] shadow-[0_0_20px_rgba(0,255,178,0.2)]"
+                  }
+                `}
+              >
+                <span className="text-[12px] font-black uppercase tracking-[0.25em]">
+                  {submitting ? "Processing Ledger..." : "Commit Asset to Ledger"}
+                </span>
+                {!submitting && <ArrowRight className="w-5 h-5" strokeWidth={2.5} />}
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
